@@ -3,6 +3,6 @@
   "minVersion": "0.8",
   "package": "io.github.itskorayyt.privacy.mixin",
   "compatibilityLevel": "JAVA_25",
-  "client": ["HandshakeMixin", "ConfigurationMixin", "OutgoingPayloadMixin", "IncomingPayloadMixin", "SignEditorMixin"],
+  "client": ["HandshakeMixin", "ConfigurationMixin", "LegacyAdvertisementMixin", "OutgoingPayloadMixin", "IncomingPayloadMixin", "SignEditorMixin"],
   "injectors": {"defaultRequire": 1}
 }

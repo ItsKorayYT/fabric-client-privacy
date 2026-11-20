@@ -9,8 +9,16 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TransformationTest {
-    @Test void allFiveClientTargetsTransform() throws Exception {
+    @Test void loadedFabricApiEnablesChannelFiltering() {
+        var api = FabricLoader.getInstance().getModContainer("fabric-api").orElseThrow();
+        assertEquals(System.getProperty("test.fabricApiVersion"), api.getMetadata().getVersion().getFriendlyString());
+        assertTrue(ClientPrivacy.supportsInstalledNetworking());
+    }
+
+    @Test void allClientTargetsTransform() throws Exception {
         assertTrue(FabricLoader.getInstance().isModLoaded("fabric_client_privacy"));
+        var addon = Class.forName("net.fabricmc.fabric.impl.networking.AbstractChanneledNetworkAddon");
+        assertTrue(Arrays.stream(addon.getDeclaredMethods()).anyMatch(method -> method.getName().contains("privacy")));
         for (String target : List.of("client.multiplayer.ClientHandshakePacketListenerImpl",
                 "client.multiplayer.ClientConfigurationPacketListenerImpl",
                 "client.multiplayer.ClientCommonPacketListenerImpl",
