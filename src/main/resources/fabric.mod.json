@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "fabric_client_privacy",
+  "version": "${version}",
+  "name": "Fabric Client Privacy",
+  "description": "Selective multiplayer metadata privacy controls for Minecraft 26.3.",
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {"client": ["io.github.itskorayyt.privacy.ClientPrivacy"]},
+  "mixins": ["fabric-client-privacy.mixins.json"],
+  "depends": {"minecraft": "=26.3", "java": ">=25", "fabricloader": ">=0.20.1"}
+}

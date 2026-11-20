@@ -1,0 +1,33 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version '1.19.4'
+}
+
+version = '1.0.0+26.3'
+group = 'io.github.itskorayyt'
+
+repositories { mavenCentral() }
+
+dependencies {
+    minecraft 'com.mojang:minecraft:26.3'
+    implementation 'net.fabricmc:fabric-loader:0.20.1'
+    compileOnly 'net.fabricmc.fabric-api:fabric-networking-api-v1:6.4.1+c58129785d'
+    runtimeOnly 'net.fabricmc.fabric-api:fabric-api:0.166.2+26.3'
+    testImplementation 'net.fabricmc.fabric-api:fabric-networking-api-v1:6.4.1+c58129785d'
+    testImplementation 'net.fabricmc:fabric-loader-junit:0.20.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+    withSourcesJar()
+}
+
+processResources {
+    def modVersion = project.version.toString()
+    inputs.property 'version', modVersion
+    filesMatching('fabric.mod.json') { expand(version: modVersion) }
+}
+
+test { useJUnitPlatform() }
+jar { from('LICENSE') }

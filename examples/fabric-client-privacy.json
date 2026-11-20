@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "spoofClientBrand": true,
+  "filterModChannels": true,
+  "filterKnownPacks": true,
+  "protectTranslationProbes": true,
+  "debugLogging": false,
+  "allowedChannels": []
+}
