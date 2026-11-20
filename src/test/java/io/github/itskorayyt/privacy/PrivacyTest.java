@@ -65,7 +65,7 @@ class PrivacyTest {
                 assertFalse(buf.isReadable());
                 var empty = (RegistrationPayload) ChannelFilter.apply(new RegistrationPayload(type, List.of(MAP)), Set.of());
                 codec.encode(buf, empty);
-                assertTrue(codec.decode(buf).channels().isEmpty());
+                assertEquals(0, buf.readableBytes());
             } finally {
                 buf.release();
             }

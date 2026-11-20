@@ -1,6 +1,8 @@
 package io.github.itskorayyt.privacy.network;
 
+import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import net.fabricmc.fabric.impl.networking.CommonRegisterPayload;
 import net.fabricmc.fabric.impl.networking.RegistrationPayload;
@@ -18,9 +20,17 @@ public final class ChannelFilter {
         };
     }
 
+    public static Collection<Identifier> legacyChannels(Collection<Identifier> channels, Set<String> allowed) {
+        for (var id : channels) {
+            if (!advertised(id, allowed)) return channels.stream().filter(channel -> advertised(channel, allowed)).toList();
+        }
+        return channels;
+    }
+
     public static CustomPacketPayload apply(CustomPacketPayload payload, Set<String> allowed) {
-        if (payload instanceof RegistrationPayload p && p.channels().stream().anyMatch(id -> !advertised(id, allowed))) {
-            return new RegistrationPayload(p.type(), p.channels().stream().filter(id -> advertised(id, allowed)).toList());
+        if (payload instanceof RegistrationPayload p) {
+            var kept = legacyChannels(p.channels(), allowed);
+            if (kept != p.channels()) return new RegistrationPayload(p.type(), List.copyOf(kept));
         }
         if (payload instanceof CommonRegisterPayload p && p.channels().stream().anyMatch(id -> !advertised(id, allowed))) {
             var kept = new LinkedHashSet<Identifier>();
