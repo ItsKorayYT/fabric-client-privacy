@@ -1,6 +1,9 @@
 package io.github.itskorayyt.privacy;
 
-import io.github.itskorayyt.privacy.config.*;
+import io.github.itskorayyt.privacy.config.ConfigFile;
+import io.github.itskorayyt.privacy.config.Settings;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Set;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
@@ -17,15 +20,28 @@ public final class ClientPrivacy implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         var loader = FabricLoader.getInstance();
-        settings = ConfigFile.load(loader.getConfigDir().resolve("fabric-client-privacy.json"));
+        settings = ConfigFile.load(configPath());
         // The optional typed adapter uses Fabric Networking implementation records.
         channelAdapter = supportsInstalledNetworking();
+        if (settings.enabled() && settings.filterModChannels() && !channelAdapter
+                && loader.isModLoaded("fabric-networking-api-v1")) {
+            PrivacyLog.unsupportedNetworking();
+        }
     }
 
     static boolean supportsInstalledNetworking() {
         return FabricLoader.getInstance().getModContainer("fabric-networking-api-v1")
                 .map(mod -> NETWORKING_BUILDS.contains(mod.getMetadata().getVersion().getFriendlyString()))
                 .orElse(false);
+    }
+
+    private static Path configPath() {
+        return FabricLoader.getInstance().getConfigDir().resolve("fabric-client-privacy.json");
+    }
+
+    public static synchronized void saveSettings(Settings updated) throws IOException {
+        ConfigFile.save(configPath(), updated);
+        settings = updated;
     }
 
     public static Settings settings() { return settings; }

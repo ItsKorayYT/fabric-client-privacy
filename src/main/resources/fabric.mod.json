@@ -6,7 +6,10 @@
   "description": "Selective multiplayer metadata privacy controls for Minecraft 26.3.",
   "license": "MIT",
   "environment": "client",
-  "entrypoints": {"client": ["io.github.itskorayyt.privacy.ClientPrivacy"]},
+  "entrypoints": {
+    "client": ["io.github.itskorayyt.privacy.ClientPrivacy"],
+    "modmenu": ["io.github.itskorayyt.privacy.ui.PrivacyModMenuIntegration"]
+  },
   "mixins": ["fabric-client-privacy.mixins.json"],
   "depends": {"minecraft": "=26.3", "java": ">=25", "fabricloader": ">=0.20.1"}
 }
