@@ -1,7 +1,7 @@
 package io.github.itskorayyt.privacy;
 
 import io.github.itskorayyt.privacy.network.LoginQueryApproval;
-import io.github.itskorayyt.privacy.network.SignPrivacy;
+import io.github.itskorayyt.privacy.network.EditorTextPrivacy;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -63,6 +63,8 @@ class TransformationTest {
                 "client.multiplayer.ClientConfigurationPacketListenerImpl",
                 "client.multiplayer.ClientCommonPacketListenerImpl",
                 "client.gui.screens.inventory.AbstractSignEditScreen",
+                "client.gui.screens.inventory.AnvilScreen",
+                "network.PacketEncoder",
                 "client.gui.screens.options.OptionsScreen",
                 "network.chat.contents.TranslatableContents",
                 "network.Connection")) {
@@ -177,14 +179,14 @@ class TransformationTest {
 
     @Test void signEditorUsesVanillaTextAndDoesNotLookUpModKeys() {
         var vanilla = Language.DEFAULT_INSTANCE;
-        assertEquals("plain text", SignPrivacy.editorLine(Component.literal("plain text"), vanilla));
-        assertEquals("Apple", SignPrivacy.editorLine(Component.translatable("item.minecraft.apple"), vanilla));
-        assertEquals("example.settings", SignPrivacy.editorLine(Component.translatable("example.settings"), vanilla));
-        assertEquals("config.fabric_client_privacy.title", SignPrivacy.editorLine(
+        assertEquals("plain text", EditorTextPrivacy.editorLine(Component.literal("plain text"), vanilla));
+        assertEquals("Apple", EditorTextPrivacy.editorLine(Component.translatable("item.minecraft.apple"), vanilla));
+        assertEquals("example.settings", EditorTextPrivacy.editorLine(Component.translatable("example.settings"), vanilla));
+        assertEquals("config.fabric_client_privacy.title", EditorTextPrivacy.editorLine(
                 Component.translatable("config.fabric_client_privacy.title"), vanilla));
-        assertEquals("fallback", SignPrivacy.editorLine(
+        assertEquals("fallback", EditorTextPrivacy.editorLine(
                 Component.translatableWithFallback("example.settings", "fallback"), vanilla));
-        assertEquals("key.example.toggle", SignPrivacy.editorLine(Component.keybind("key.example.toggle"), vanilla));
+        assertEquals("key.example.toggle", EditorTextPrivacy.editorLine(Component.keybind("key.example.toggle"), vanilla));
     }
 
     @Test void signEditorSanitizesNestedFormattingAndObjectFallbacks() {
@@ -195,10 +197,10 @@ class TransformationTest {
         var line = Component.translatableWithFallback("example.formatted", "%2$s : %1$s %%", object,
                 Component.literal("before ").append(Component.keybind("key.example.toggle")))
                 .append(" after");
-        assertEquals("before key.example.toggle : example.private % after", SignPrivacy.editorLine(line, vanilla));
-        assertEquals("invalid %s %q", SignPrivacy.editorLine(
+        assertEquals("before key.example.toggle : example.private % after", EditorTextPrivacy.editorLine(line, vanilla));
+        assertEquals("invalid %s %q", EditorTextPrivacy.editorLine(
                 Component.translatableWithFallback("example.invalid", "invalid %s %q", "argument"), vanilla));
-        assertEquals(383, SignPrivacy.editorLine(
+        assertEquals(383, EditorTextPrivacy.editorLine(
                 Component.translatableWithFallback("example.long", "a".repeat(383) + "😀"), vanilla).length());
     }
 
@@ -211,8 +213,8 @@ class TransformationTest {
                 .pushJarResources().pushUniversalPath(directory)
                 .build(new PackLocationInfo("vanilla", Component.literal("Vanilla"), PackSource.BUILT_IN, Optional.empty()));
 
-        var german = SignPrivacy.vanillaLanguage(pack, "de_de");
-        assertEquals("Apfel", SignPrivacy.editorLine(Component.translatable("item.minecraft.apple"), german));
+        var german = EditorTextPrivacy.vanillaLanguage(pack, "de_de");
+        assertEquals("Apfel", EditorTextPrivacy.editorLine(Component.translatable("item.minecraft.apple"), german));
         var activeLanguages = Files.createDirectories(directory.resolve("active/assets/minecraft/lang"));
         Files.writeString(activeLanguages.resolve("de_de.json"), """
                 {"item.minecraft.apple":"Pack override","example.settings":"Local add-on text"}
@@ -226,13 +228,13 @@ class TransformationTest {
         try {
             var line = Component.translatable("example.settings");
             assertEquals("Local add-on text", line.getString());
-            assertEquals("example.settings", SignPrivacy.editorLine(line, german));
-            assertEquals("Apfel", SignPrivacy.editorLine(Component.translatable("item.minecraft.apple"), german));
+            assertEquals("example.settings", EditorTextPrivacy.editorLine(line, german));
+            assertEquals("Apfel", EditorTextPrivacy.editorLine(Component.translatable("item.minecraft.apple"), german));
         } finally {
             Language.inject(earlier);
         }
-        assertSame(Language.DEFAULT_INSTANCE, SignPrivacy.vanillaLanguage(pack, "example_missing"));
-        assertSame(Language.DEFAULT_INSTANCE, SignPrivacy.vanillaLanguage(pack, Language.DEFAULT));
+        assertSame(Language.DEFAULT_INSTANCE, EditorTextPrivacy.vanillaLanguage(pack, "example_missing"));
+        assertSame(Language.DEFAULT_INSTANCE, EditorTextPrivacy.vanillaLanguage(pack, Language.DEFAULT));
     }
 
     private record ModData(int value) implements CustomPacketPayload {

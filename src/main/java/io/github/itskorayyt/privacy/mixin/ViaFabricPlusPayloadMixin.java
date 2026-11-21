@@ -1,6 +1,7 @@
 package io.github.itskorayyt.privacy.mixin;
 
 import io.github.itskorayyt.privacy.ClientPrivacy;
+import io.github.itskorayyt.privacy.PrivacyLog;
 import io.github.itskorayyt.privacy.network.ChannelFilter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
@@ -31,6 +32,7 @@ abstract class ViaFabricPlusPayloadMixin {
         var id = Identifier.tryParse(channel);
         if (id == null || !ChannelFilter.allowed(id, settings)) {
             callback.cancel();
+            PrivacyLog.traceViaBlock(connection);
         }
     }
 }

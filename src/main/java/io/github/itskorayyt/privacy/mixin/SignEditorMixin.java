@@ -4,7 +4,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.itskorayyt.privacy.ClientPrivacy;
 import io.github.itskorayyt.privacy.PrivacyLog;
-import io.github.itskorayyt.privacy.network.SignPrivacy;
+import io.github.itskorayyt.privacy.network.EditorTextPrivacy;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
 import net.minecraft.network.chat.Component;
@@ -23,12 +23,10 @@ abstract class SignEditorMixin {
             PrivacyLog.trace(listener.getConnection(), PrivacyLog.Event.SIGN_EDITOR_PREFILLED);
         }
         if (config.enabled() && config.protectTranslationProbes() && !client.hasSingleplayerServer()) {
-            var language = SignPrivacy.vanillaLanguage(client.getVanillaPackResources(), client.getLanguageManager().getSelected());
-            String text = SignPrivacy.editorLine(line, language);
-            if (listener != null && SignPrivacy.isStructured(line)) {
+            if (listener != null && EditorTextPrivacy.isStructured(line)) {
                 PrivacyLog.trace(listener.getConnection(), PrivacyLog.Event.SIGN_PREFILL_SANITIZED);
             }
-            return text;
+            return EditorTextPrivacy.editorLine(line, client);
         }
         return original.call(line);
     }

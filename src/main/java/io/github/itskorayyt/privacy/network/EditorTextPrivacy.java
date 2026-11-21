@@ -3,6 +3,7 @@ package io.github.itskorayyt.privacy.network;
 import io.github.itskorayyt.privacy.mixin.TranslatableContentsInvoker;
 import java.util.List;
 import java.util.Optional;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.ClientLanguage;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
@@ -14,7 +15,7 @@ import net.minecraft.network.chat.contents.TranslatableFormatException;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.VanillaPackResources;
 
-public final class SignPrivacy {
+public final class EditorTextPrivacy {
     private static final int MAX_LINE_LENGTH = 384;
     private static final int MAX_DEPTH = 64;
     private static final int MAX_COMPONENTS = 2048;
@@ -22,7 +23,7 @@ public final class SignPrivacy {
     private static String cachedLocale = Language.DEFAULT;
     private static Language cachedLanguage = Language.DEFAULT_INSTANCE;
 
-    private SignPrivacy() {}
+    private EditorTextPrivacy() {}
 
     // Called on the render thread. VanillaPackResources excludes the profile's active resource packs.
     public static Language vanillaLanguage(VanillaPackResources vanilla, String locale) {
@@ -37,6 +38,11 @@ public final class SignPrivacy {
         return cachedLanguage;
     }
 
+    public static String editorLine(Component line, Minecraft client) {
+        var language = vanillaLanguage(client.getVanillaPackResources(), client.getLanguageManager().getSelected());
+        return editorLine(line, language);
+    }
+
     public static boolean isStructured(Component line) {
         return !(line.getContents() instanceof PlainTextContents) || !line.getSiblings().isEmpty();
     }
@@ -45,7 +51,7 @@ public final class SignPrivacy {
         if (!isStructured(line)) {
             return ((PlainTextContents) line.getContents()).text();
         }
-        var output = new SignLine(vanillaLanguage);
+        var output = new EditorText(vanillaLanguage);
         output.append(line, 0);
         int length = output.text.length();
         if (length == MAX_LINE_LENGTH && Character.isHighSurrogate(output.text.charAt(length - 1))) {
@@ -54,12 +60,12 @@ public final class SignPrivacy {
         return output.text.toString();
     }
 
-    private static final class SignLine {
+    private static final class EditorText {
         private final Language language;
         private final StringBuilder text = new StringBuilder();
         private int remainingComponents = MAX_COMPONENTS;
 
-        private SignLine(Language language) {
+        private EditorText(Language language) {
             this.language = language;
         }
 
