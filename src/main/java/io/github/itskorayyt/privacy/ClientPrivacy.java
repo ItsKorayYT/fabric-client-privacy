@@ -20,6 +20,10 @@ public final class ClientPrivacy implements ClientModInitializer {
         settings = ConfigFile.load(loader.getConfigDir().resolve("fabric-client-privacy.json"));
         // The optional typed adapter uses Fabric Networking implementation records.
         channelAdapter = supportsInstalledNetworking();
+        if (settings.enabled() && settings.filterModChannels() && !channelAdapter
+                && loader.isModLoaded("fabric-networking-api-v1")) {
+            PrivacyLog.unsupportedNetworking();
+        }
     }
 
     static boolean supportsInstalledNetworking() {

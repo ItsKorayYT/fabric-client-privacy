@@ -1,10 +1,40 @@
 package io.github.itskorayyt.privacy;
 
+import io.github.itskorayyt.privacy.network.LoginQueryApproval;
 import io.github.itskorayyt.privacy.network.SignPrivacy;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.embedded.EmbeddedChannel;
 import java.util.List;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicReference;
+import net.fabricmc.fabric.api.client.networking.v1.ClientLoginNetworking;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.impl.networking.payload.FriendlyByteBufLoginQueryRequestPayload;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.SharedConstants;
+import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.network.Connection;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.PacketEncoder;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
+import net.minecraft.network.protocol.common.ServerboundKeepAlivePacket;
+import net.minecraft.network.protocol.common.custom.BrandPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.DiscardedPayload;
+import net.minecraft.network.protocol.configuration.ConfigurationProtocols;
+import net.minecraft.network.protocol.game.GameProtocols;
+import net.minecraft.network.protocol.login.ClientboundCustomQueryPacket;
+import net.minecraft.network.protocol.login.LoginProtocols;
+import net.minecraft.network.protocol.login.ServerboundCustomQueryAnswerPacket;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -17,16 +47,117 @@ class TransformationTest {
 
     @Test void allClientTargetsTransform() throws Exception {
         assertTrue(FabricLoader.getInstance().isModLoaded("fabric_client_privacy"));
-        var addon = Class.forName("net.fabricmc.fabric.impl.networking.AbstractChanneledNetworkAddon");
-        assertTrue(Arrays.stream(addon.getDeclaredMethods()).anyMatch(method -> method.getName().contains("privacy")));
         for (String target : List.of("client.multiplayer.ClientHandshakePacketListenerImpl",
                 "client.multiplayer.ClientConfigurationPacketListenerImpl",
                 "client.multiplayer.ClientCommonPacketListenerImpl",
                 "client.gui.screens.inventory.AbstractSignEditScreen",
-                "network.protocol.common.ServerboundCustomPayloadPacket")) {
+                "network.Connection")) {
             var type = Class.forName("net.minecraft." + target, false, getClass().getClassLoader());
             assertTrue(Arrays.stream(type.getDeclaredMethods())
                     .anyMatch(method -> method.getName().contains("privacy")), target);
+        }
+    }
+
+    @Test void connectionFiltersBeforeEncodingAndPreservesOrdinaryPackets() {
+        SharedConstants.tryDetectVersion();
+        Bootstrap.bootStrap();
+        var connection = new Connection(PacketFlow.CLIENTBOUND);
+        var channel = new EmbeddedChannel(new PacketEncoder<>(ConfigurationProtocols.SERVERBOUND), connection);
+        try {
+            var blocked = new DiscardedPayload(Identifier.parse("example:optional_data"));
+            var sendResult = new AtomicReference<Throwable>();
+            connection.send(new ServerboundCustomPayloadPacket(blocked), future -> sendResult.set(future.cause()));
+            assertInstanceOf(IllegalStateException.class, sendResult.get());
+            assertNull(channel.readOutbound());
+
+            connection.send(new ServerboundCustomPayloadPacket(new BrandPayload("fabric")));
+            try (var encoded = new PacketBuffer(channel.readOutbound())) {
+                encoded.buffer.readVarInt();
+                assertEquals(new BrandPayload("vanilla"),
+                        ServerboundCustomPayloadPacket.STREAM_CODEC.decode(encoded.buffer).payload());
+            }
+
+            connection.send(new ServerboundKeepAlivePacket(91));
+            try (var encoded = new PacketBuffer(channel.readOutbound())) {
+                encoded.buffer.readVarInt();
+                assertEquals(91L, ServerboundKeepAlivePacket.STREAM_CODEC.decode(encoded.buffer).getId());
+            }
+            assertNull(channel.readOutbound());
+        } finally {
+            channel.finishAndReleaseAll();
+        }
+    }
+
+    @Test void playConnectionBlocksARegisteredFabricModPayload() {
+        SharedConstants.tryDetectVersion();
+        Bootstrap.bootStrap();
+        PayloadTypeRegistry.serverboundPlay().register(ModData.TYPE, ModData.CODEC);
+        var context = new GameProtocols.Context() {
+            @Override public boolean hasInfiniteMaterials() { return false; }
+            @Override public boolean canUseCommandBlocks() { return false; }
+        };
+        var protocol = GameProtocols.SERVERBOUND_TEMPLATE.bind(RegistryFriendlyByteBuf.decorator(RegistryAccess.EMPTY), context);
+        var connection = new Connection(PacketFlow.CLIENTBOUND);
+        var channel = new EmbeddedChannel(new PacketEncoder<>(protocol), connection);
+        try {
+            connection.send(ClientPlayNetworking.createServerboundPacket(new ModData(42)));
+            assertNull(channel.readOutbound());
+        } finally {
+            channel.finishAndReleaseAll();
+        }
+    }
+
+    @Test void directLoginAnswerMaySendDataOnlyOnceForAnApprovedQuery() {
+        var connection = new Connection(PacketFlow.CLIENTBOUND);
+        var channel = new EmbeddedChannel(new PacketEncoder<>(LoginProtocols.SERVERBOUND), connection);
+        try {
+            var answer = new ServerboundCustomQueryAnswerPacket(29, buffer -> buffer.writeByte(42));
+            connection.send(answer);
+            assertNull(channel.readOutbound());
+
+            ((LoginQueryApproval) connection).privacy$allowLoginAnswer(29);
+            connection.send(answer);
+            try (var encoded = new PacketBuffer(channel.readOutbound())) {
+                encoded.buffer.readVarInt();
+                assertEquals(29, encoded.buffer.readVarInt());
+                assertTrue(encoded.buffer.readBoolean());
+                assertEquals(42, encoded.buffer.readUnsignedByte());
+                assertFalse(encoded.buffer.isReadable());
+            }
+
+            connection.send(answer);
+            assertNull(channel.readOutbound());
+        } finally {
+            channel.finishAndReleaseAll();
+        }
+    }
+
+    @Test void unapprovedLoginQuerySendsEmptyAnswerWithoutCallingFabricReceiver() {
+        var id = Identifier.parse("example:login_probe");
+        assertTrue(ClientLoginNetworking.registerGlobalReceiver(id, (client, listener, buffer, sender) -> {
+            fail("Unapproved login query reached the Fabric receiver");
+            return null;
+        }));
+        var connection = new Connection(PacketFlow.CLIENTBOUND);
+        var channel = new EmbeddedChannel(new PacketEncoder<>(LoginProtocols.SERVERBOUND), connection);
+        var requestData = new FriendlyByteBuf(Unpooled.buffer().writeByte(42));
+        try {
+            var listener = new ClientHandshakePacketListenerImpl(connection, null, null, null,
+                    false, null, status -> {}, null, null);
+            listener.handleCustomQuery(new ClientboundCustomQueryPacket(17,
+                    new FriendlyByteBufLoginQueryRequestPayload(id, requestData)));
+
+            try (var answer = new PacketBuffer(channel.readOutbound())) {
+                answer.buffer.readVarInt();
+                assertEquals(17, answer.buffer.readVarInt());
+                assertFalse(answer.buffer.readBoolean());
+                assertFalse(answer.buffer.isReadable());
+            }
+            assertNull(channel.readOutbound());
+        } finally {
+            requestData.release();
+            ClientLoginNetworking.unregisterGlobalReceiver(id);
+            channel.finishAndReleaseAll();
         }
     }
 
@@ -39,5 +170,32 @@ class TransformationTest {
         assertNull(SignPrivacy.replacement(Component.translatable(key).append(" more")));
         assertNull(SignPrivacy.replacement(Component.translatable(key, "argument")));
         assertNull(SignPrivacy.replacement(Component.translatableWithFallback(key, "%s")));
+    }
+
+    private record ModData(int value) implements CustomPacketPayload {
+        private static final Type<ModData> TYPE = new Type<>(Identifier.parse("example:play_data"));
+        private static final StreamCodec<RegistryFriendlyByteBuf, ModData> CODEC =
+                StreamCodec.of((buffer, data) -> buffer.writeInt(data.value()), buffer -> new ModData(buffer.readInt()));
+
+        @Override public Type<ModData> type() {
+            return TYPE;
+        }
+    }
+
+    private static final class PacketBuffer implements AutoCloseable {
+        private final FriendlyByteBuf buffer;
+
+        PacketBuffer(ByteBuf bytes) {
+            buffer = new FriendlyByteBuf(assertNotNullBuffer(bytes));
+        }
+
+        private static ByteBuf assertNotNullBuffer(ByteBuf bytes) {
+            assertNotNull(bytes, "No packet was written");
+            return bytes;
+        }
+
+        @Override public void close() {
+            buffer.release();
+        }
     }
 }

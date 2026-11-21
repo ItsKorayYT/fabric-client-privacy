@@ -36,6 +36,7 @@ public final class ConfigFile {
             return new Settings(flag(root, "enabled", d.enabled()), flag(root, "spoofClientBrand", d.spoofClientBrand()),
                     flag(root, "filterModChannels", d.filterModChannels()), flag(root, "filterKnownPacks", d.filterKnownPacks()),
                     flag(root, "protectTranslationProbes", d.protectTranslationProbes()),
+                    flag(root, "blockUnapprovedCustomPayloads", d.blockUnapprovedCustomPayloads()),
                     flag(root, "debugLogging", d.debugLogging()), channels);
         } catch (IOException | JsonParseException ex) {
             PrivacyLog.configUnavailable();

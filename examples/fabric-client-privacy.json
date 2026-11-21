@@ -4,6 +4,7 @@
   "filterModChannels": true,
   "filterKnownPacks": true,
   "protectTranslationProbes": true,
+  "blockUnapprovedCustomPayloads": true,
   "debugLogging": false,
   "allowedChannels": []
 }
