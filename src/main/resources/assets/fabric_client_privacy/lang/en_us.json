@@ -9,7 +9,7 @@
   "config.fabric_client_privacy.packs": "Filter known packs",
   "config.fabric_client_privacy.packs.tooltip": "Only confirm matching built-in Minecraft packs.",
   "config.fabric_client_privacy.signs": "Protect sign text",
-  "config.fabric_client_privacy.signs.tooltip": "Hide mod translations from supported US-English sign probes.",
+  "config.fabric_client_privacy.signs.tooltip": "Use built-in translations and hide local key bindings when editing multiplayer signs.",
   "config.fabric_client_privacy.payloads": "Block mod payloads",
   "config.fabric_client_privacy.payloads.tooltip": "Block unapproved custom login replies and mod packets.",
   "config.fabric_client_privacy.debug": "Debug logging",
