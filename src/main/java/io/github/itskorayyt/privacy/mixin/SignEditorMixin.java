@@ -3,12 +3,11 @@ package io.github.itskorayyt.privacy.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.itskorayyt.privacy.ClientPrivacy;
-import io.github.itskorayyt.privacy.network.SignPrivacy;
+import io.github.itskorayyt.privacy.PrivacyLog;
+import io.github.itskorayyt.privacy.network.EditorTextPrivacy;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
-import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packs.repository.PackSource;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
@@ -19,13 +18,15 @@ abstract class SignEditorMixin {
     private String privacyEditText(Component line, Operation<String> original) {
         var config = ClientPrivacy.settings();
         var client = Minecraft.getInstance();
-        if (config.enabled() && config.protectTranslationProbes() && !client.hasSingleplayerServer()
-                && Language.DEFAULT.equals(client.getLanguageManager().getSelected())) {
-            var replacement = SignPrivacy.replacement(line);
-            if (replacement != null && client.getResourcePackRepository().getSelectedPacks().stream()
-                    .noneMatch(pack -> pack.getPackSource() == PackSource.SERVER || pack.getId().startsWith("file/"))) {
-                return replacement;
+        var listener = config.debugLogging() ? client.getConnection() : null;
+        if (listener != null) {
+            PrivacyLog.trace(listener.getConnection(), PrivacyLog.Event.SIGN_EDITOR_PREFILLED);
+        }
+        if (config.enabled() && config.protectTranslationProbes() && !client.hasSingleplayerServer()) {
+            if (listener != null && EditorTextPrivacy.isStructured(line)) {
+                PrivacyLog.trace(listener.getConnection(), PrivacyLog.Event.SIGN_PREFILL_SANITIZED);
             }
+            return EditorTextPrivacy.editorLine(line, client);
         }
         return original.call(line);
     }

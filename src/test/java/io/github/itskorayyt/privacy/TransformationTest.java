@@ -1,11 +1,14 @@
 package io.github.itskorayyt.privacy;
 
 import io.github.itskorayyt.privacy.network.LoginQueryApproval;
-import io.github.itskorayyt.privacy.network.SignPrivacy;
+import io.github.itskorayyt.privacy.network.EditorTextPrivacy;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.client.networking.v1.ClientLoginNetworking;
@@ -15,13 +18,18 @@ import net.fabricmc.fabric.impl.networking.payload.FriendlyByteBufLoginQueryRequ
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
+import net.minecraft.client.resources.language.ClientLanguage;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.locale.Language;
 import net.minecraft.network.Connection;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.PacketEncoder;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.contents.ObjectContents;
+import net.minecraft.network.chat.contents.objects.AtlasSprite;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.ServerboundKeepAlivePacket;
@@ -35,7 +43,11 @@ import net.minecraft.network.protocol.login.LoginProtocols;
 import net.minecraft.network.protocol.login.ServerboundCustomQueryAnswerPacket;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.VanillaPackResourcesBuilder;
+import net.minecraft.server.packs.repository.PackSource;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TransformationTest {
@@ -51,7 +63,10 @@ class TransformationTest {
                 "client.multiplayer.ClientConfigurationPacketListenerImpl",
                 "client.multiplayer.ClientCommonPacketListenerImpl",
                 "client.gui.screens.inventory.AbstractSignEditScreen",
+                "client.gui.screens.inventory.AnvilScreen",
+                "network.PacketEncoder",
                 "client.gui.screens.options.OptionsScreen",
+                "network.chat.contents.TranslatableContents",
                 "network.Connection")) {
             var type = Class.forName("net.minecraft." + target, false, getClass().getClassLoader());
             assertTrue(Arrays.stream(type.getDeclaredMethods())
@@ -162,17 +177,64 @@ class TransformationTest {
         }
     }
 
-    @Test void simpleModSignUsesVanillaFallback() {
-        String key = "item.fabric_client_privacy.sample";
-        assertEquals(key, SignPrivacy.replacement(Component.translatable(key)));
-        String configKey = "config.fabric_client_privacy.title";
-        assertEquals(configKey, SignPrivacy.replacement(Component.translatable(configKey)));
-        assertEquals("fallback", SignPrivacy.replacement(Component.translatableWithFallback(key, "fallback")));
-        assertNull(SignPrivacy.replacement(Component.literal("unchanged")));
-        assertNull(SignPrivacy.replacement(Component.translatable("item.minecraft.apple")));
-        assertNull(SignPrivacy.replacement(Component.translatable(key).append(" more")));
-        assertNull(SignPrivacy.replacement(Component.translatable(key, "argument")));
-        assertNull(SignPrivacy.replacement(Component.translatableWithFallback(key, "%s")));
+    @Test void signEditorUsesVanillaTextAndDoesNotLookUpModKeys() {
+        var vanilla = Language.DEFAULT_INSTANCE;
+        assertEquals("plain text", EditorTextPrivacy.editorLine(Component.literal("plain text"), vanilla));
+        assertEquals("Apple", EditorTextPrivacy.editorLine(Component.translatable("item.minecraft.apple"), vanilla));
+        assertEquals("example.settings", EditorTextPrivacy.editorLine(Component.translatable("example.settings"), vanilla));
+        assertEquals("config.fabric_client_privacy.title", EditorTextPrivacy.editorLine(
+                Component.translatable("config.fabric_client_privacy.title"), vanilla));
+        assertEquals("fallback", EditorTextPrivacy.editorLine(
+                Component.translatableWithFallback("example.settings", "fallback"), vanilla));
+        assertEquals("key.example.toggle", EditorTextPrivacy.editorLine(Component.keybind("key.example.toggle"), vanilla));
+    }
+
+    @Test void signEditorSanitizesNestedFormattingAndObjectFallbacks() {
+        var vanilla = Language.DEFAULT_INSTANCE;
+        var object = MutableComponent.create(new ObjectContents(
+                new AtlasSprite(AtlasSprite.DEFAULT_ATLAS, Identifier.withDefaultNamespace("example")),
+                Optional.of(Component.translatable("example.private"))));
+        var line = Component.translatableWithFallback("example.formatted", "%2$s : %1$s %%", object,
+                Component.literal("before ").append(Component.keybind("key.example.toggle")))
+                .append(" after");
+        assertEquals("before key.example.toggle : example.private % after", EditorTextPrivacy.editorLine(line, vanilla));
+        assertEquals("invalid %s %q", EditorTextPrivacy.editorLine(
+                Component.translatableWithFallback("example.invalid", "invalid %s %q", "argument"), vanilla));
+        assertEquals(383, EditorTextPrivacy.editorLine(
+                Component.translatableWithFallback("example.long", "a".repeat(383) + "😀"), vanilla).length());
+    }
+
+    @Test void signEditorKeepsBuiltInNonEnglishTranslations(@TempDir Path directory) throws Exception {
+        var languages = Files.createDirectories(directory.resolve("assets/minecraft/lang"));
+        Files.writeString(languages.resolve("de_de.json"), """
+                {"item.minecraft.apple":"Apfel"}
+                """);
+        var pack = new VanillaPackResourcesBuilder().exposeNamespace("minecraft")
+                .pushJarResources().pushUniversalPath(directory)
+                .build(new PackLocationInfo("vanilla", Component.literal("Vanilla"), PackSource.BUILT_IN, Optional.empty()));
+
+        var german = EditorTextPrivacy.vanillaLanguage(pack, "de_de");
+        assertEquals("Apfel", EditorTextPrivacy.editorLine(Component.translatable("item.minecraft.apple"), german));
+        var activeLanguages = Files.createDirectories(directory.resolve("active/assets/minecraft/lang"));
+        Files.writeString(activeLanguages.resolve("de_de.json"), """
+                {"item.minecraft.apple":"Pack override","example.settings":"Local add-on text"}
+                """);
+        var activePack = new VanillaPackResourcesBuilder().exposeNamespace("minecraft")
+                .pushUniversalPath(directory.resolve("active"))
+                .build(new PackLocationInfo("active", Component.literal("Active"), PackSource.SERVER, Optional.empty()));
+        var active = ClientLanguage.loadFrom(activePack.asResourceManager(), List.of("de_de"), false);
+        var earlier = Language.getInstance();
+        Language.inject(active);
+        try {
+            var line = Component.translatable("example.settings");
+            assertEquals("Local add-on text", line.getString());
+            assertEquals("example.settings", EditorTextPrivacy.editorLine(line, german));
+            assertEquals("Apfel", EditorTextPrivacy.editorLine(Component.translatable("item.minecraft.apple"), german));
+        } finally {
+            Language.inject(earlier);
+        }
+        assertSame(Language.DEFAULT_INSTANCE, EditorTextPrivacy.vanillaLanguage(pack, "example_missing"));
+        assertSame(Language.DEFAULT_INSTANCE, EditorTextPrivacy.vanillaLanguage(pack, Language.DEFAULT));
     }
 
     private record ModData(int value) implements CustomPacketPayload {
