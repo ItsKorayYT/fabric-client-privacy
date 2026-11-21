@@ -1,5 +1,6 @@
 package io.github.itskorayyt.privacy;
 
+import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -23,6 +24,10 @@ public final class PrivacyLog {
 
     public static void unsupportedNetworking() {
         LOGGER.warn("Unrecognized Fabric Networking version. Channel advertisements will be blocked while channel filtering is enabled.");
+    }
+
+    public static void configSaveFailed(IOException cause) {
+        LOGGER.warn("Could not save privacy configuration.", cause);
     }
 
     public static void configUnavailable() {

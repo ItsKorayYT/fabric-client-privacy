@@ -49,6 +49,36 @@ class PrivacyTest {
         assertEquals(Set.of("example:maps/v1"), settings.allowedChannels());
     }
 
+    @Test void savesEditsAndPreservesExtraFields() throws Exception {
+        Path file = directory.resolve("config/privacy.json");
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, """
+                {"enabled":true,"futureFeature":{"value":9}}
+                """);
+        var edited = new Settings(false, true, false, true, false, true, true,
+                Set.of("example:map", "other:sync"));
+        ConfigFile.save(file, edited);
+
+        assertEquals(edited, ConfigFile.load(file));
+        var saved = com.google.gson.JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+        assertEquals(9, saved.getAsJsonObject("futureFeature").get("value").getAsInt());
+    }
+
+    @Test void failedSavePreservesExistingFile() throws Exception {
+        Path file = directory.resolve("config/privacy.json");
+        var original = ConfigFile.load(file);
+        var originalText = Files.readString(file);
+        var oversized = new HashSet<String>();
+        for (int index = 0; index < 1200; index++) {
+            oversized.add("example:" + "a".repeat(240) + index);
+        }
+
+        assertThrows(java.io.IOException.class, () -> ConfigFile.save(file, new Settings(
+                false, true, true, true, true, true, false, oversized)));
+        assertEquals(originalText, Files.readString(file));
+        assertEquals(original, ConfigFile.load(file));
+    }
+
     private static final Identifier MAP = Identifier.parse("example:map");
     private static final Identifier BRAND = Identifier.parse("minecraft:brand");
     private static final Identifier CONTROL = Identifier.parse("c:register");

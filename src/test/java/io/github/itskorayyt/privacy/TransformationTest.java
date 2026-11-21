@@ -51,6 +51,7 @@ class TransformationTest {
                 "client.multiplayer.ClientConfigurationPacketListenerImpl",
                 "client.multiplayer.ClientCommonPacketListenerImpl",
                 "client.gui.screens.inventory.AbstractSignEditScreen",
+                "client.gui.screens.options.OptionsScreen",
                 "network.Connection")) {
             var type = Class.forName("net.minecraft." + target, false, getClass().getClassLoader());
             assertTrue(Arrays.stream(type.getDeclaredMethods())
@@ -164,6 +165,8 @@ class TransformationTest {
     @Test void simpleModSignUsesVanillaFallback() {
         String key = "item.fabric_client_privacy.sample";
         assertEquals(key, SignPrivacy.replacement(Component.translatable(key)));
+        String configKey = "config.fabric_client_privacy.title";
+        assertEquals(configKey, SignPrivacy.replacement(Component.translatable(configKey)));
         assertEquals("fallback", SignPrivacy.replacement(Component.translatableWithFallback(key, "fallback")));
         assertNull(SignPrivacy.replacement(Component.literal("unchanged")));
         assertNull(SignPrivacy.replacement(Component.translatable("item.minecraft.apple")));
