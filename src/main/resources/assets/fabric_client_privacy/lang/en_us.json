@@ -13,7 +13,7 @@
   "config.fabric_client_privacy.payloads": "Block mod payloads",
   "config.fabric_client_privacy.payloads.tooltip": "Block unapproved custom login replies and mod packets.",
   "config.fabric_client_privacy.debug": "Debug logging",
-  "config.fabric_client_privacy.debug.tooltip": "Log privacy events without logging packet contents.",
+  "config.fabric_client_privacy.debug.tooltip": "Trace privacy checks per connection without logging packet contents, addresses, or channel IDs.",
   "config.fabric_client_privacy.allowlist.button": "Allowed channels (%s)",
   "config.fabric_client_privacy.allowlist.tooltip": "Allow specific channels to be announced or send data.",
   "config.fabric_client_privacy.allowlist.title": "Allowed Channels",

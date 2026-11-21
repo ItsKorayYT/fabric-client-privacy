@@ -1,25 +1,56 @@
 package io.github.itskorayyt.privacy;
 
 import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.WeakHashMap;
+import net.minecraft.network.Connection;
+import net.minecraft.network.protocol.PacketFlow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class PrivacyLog {
     private static final Logger LOGGER = LoggerFactory.getLogger("fabric-client-privacy");
-    private static final AtomicBoolean SEEN_REGISTER = new AtomicBoolean();
+    private static final Map<Connection, EnumSet<Event>> OBSERVED = new WeakHashMap<>();
 
-    private static final AtomicBoolean BLOCKED_PAYLOAD = new AtomicBoolean();
-    private static final AtomicBoolean DECLINED_QUERY = new AtomicBoolean();
+    public enum Event {
+        LOGIN_FINISHED("Minecraft processed login completion."),
+        REGISTRATION_RECEIVED("Minecraft handled an incoming channel registration."),
+        LOGIN_QUERY_DECLINED("The privacy check declined a custom login query."),
+        PAYLOAD_BLOCKED("The privacy check blocked an outgoing custom payload or login answer."),
+        BRAND_REWRITTEN("The privacy check rewrote the outgoing client brand."),
+        REGISTRATION_FILTERED("The privacy check filtered an outgoing channel advertisement."),
+        SIGN_REQUEST_RECEIVED("Minecraft received a sign editor request."),
+        SIGN_EDITOR_PREFILLED("Minecraft built sign editor prefill."),
+        SIGN_PREFILL_SANITIZED("The privacy check sanitized structured sign prefill."),
+        SIGN_UPDATE_QUEUED("A sign update reached Minecraft's outgoing packet hook.");
+
+        private final String message;
+
+        Event(String message) {
+            this.message = message;
+        }
+    }
 
     private PrivacyLog() {}
 
-    public static void payloadBlocked() {
-        if (BLOCKED_PAYLOAD.compareAndSet(false, true)) LOGGER.info("Blocked an outgoing custom payload.");
-    }
-
-    public static void loginQueryDeclined() {
-        if (DECLINED_QUERY.compareAndSet(false, true)) LOGGER.info("Declined an unapproved custom login query.");
+    public static void trace(Connection connection, Event event) {
+        var settings = ClientPrivacy.settings();
+        if (!settings.debugLogging() || connection.getSending() != PacketFlow.SERVERBOUND || connection.isMemoryConnection()) {
+            return;
+        }
+        synchronized (OBSERVED) {
+            var events = OBSERVED.computeIfAbsent(connection, ignored -> {
+                LOGGER.info("[Privacy trace] Connection settings enabled={} brand={} channels={} knownPacks={} signs={} payloads={} allowedChannelCount={} fabricAdapter={}",
+                        settings.enabled(), settings.spoofClientBrand(), settings.filterModChannels(), settings.filterKnownPacks(),
+                        settings.protectTranslationProbes(), settings.blockUnapprovedCustomPayloads(),
+                        settings.allowedChannels().size(), ClientPrivacy.hasChannelAdapter());
+                return EnumSet.noneOf(Event.class);
+            });
+            if (events.add(event)) {
+                LOGGER.info("[Privacy trace] {}", event.message);
+            }
+        }
     }
 
     public static void unsupportedNetworking() {
@@ -32,9 +63,5 @@ public final class PrivacyLog {
 
     public static void configUnavailable() {
         LOGGER.warn("Could not load privacy configuration. Using defaults for this session.");
-    }
-
-    public static void registrationSeen() {
-        if (SEEN_REGISTER.compareAndSet(false, true)) LOGGER.info("Received a channel registration request.");
     }
 }

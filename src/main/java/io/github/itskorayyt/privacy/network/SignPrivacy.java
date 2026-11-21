@@ -37,9 +37,13 @@ public final class SignPrivacy {
         return cachedLanguage;
     }
 
+    public static boolean isStructured(Component line) {
+        return !(line.getContents() instanceof PlainTextContents) || !line.getSiblings().isEmpty();
+    }
+
     public static String editorLine(Component line, Language vanillaLanguage) {
-        if (line.getContents() instanceof PlainTextContents text && line.getSiblings().isEmpty()) {
-            return text.text();
+        if (!isStructured(line)) {
+            return ((PlainTextContents) line.getContents()).text();
         }
         var output = new SignLine(vanillaLanguage);
         output.append(line, 0);

@@ -7,7 +7,7 @@
 ## Install
 
 1. Set up **Minecraft Java 26.3** with **Fabric Loader 0.20.1+** and **Java 25**.
-2. Install **Fabric Client Privacy 1.3.1** in your Minecraft profile’s `mods/` folder. Use the build instructions below if the release is still pending.
+2. Install **Fabric Client Privacy 1.3.2** in your Minecraft profile’s `mods/` folder. Use the build instructions below if the release is still pending.
 3. If you use Fabric API, versions **0.160.5 through 0.166.2** for 26.3 support filtered Fabric channel negotiation. The rest of the protections work with Fabric Loader alone.
 
 Launch the game and join as usual. The server needs no setup.
@@ -30,6 +30,8 @@ A Minecraft server still receives your connection IP address, account identity, 
 Open **Mods → Fabric Client Privacy → Configure** with Mod Menu installed. With Fabric Loader alone, open **Options → Fabric Client Privacy** from the title or pause menu. Edit the toggles or the **Allowed Channels** list, then select **Save**. The settings file updates immediately. Rejoin the server to apply changes to login, brand, pack selection and channel announcements.
 
 Leave the list empty to block optional mod payloads by default. To enable a trusted channel, enter its exact ID on its own line, for example `example:map_sync`. This allows channel advertisements, login responses and custom payloads for that ID. A server that requires a mod handshake can refuse the connection until its channels are allowed.
+
+For a connection test, turn on **Debug logging** and reconnect. The `[Privacy trace]` lines in `logs/latest.log` record the active settings and the first occurrence of each observed event per connection. This trace excludes server addresses, channel IDs and packet contents.
 
 You can also edit `config/fabric-client-privacy.json` while Minecraft is closed. [View the settings and defaults](examples/fabric-client-privacy.json)
 
